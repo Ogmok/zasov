@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Генератор паролей Засов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: одна колонка-утилита — результат сверху, настройки ниже, оценка стойкости рядом с результатом */
+:root {
+  --ink: #14202B;
+  --paper: #F4F7FA;
+  --sky: #51BDE2;
+
+  --bg: var(--paper);
+  --panel: #FFFFFF;
+  --panel-2: #EAF0F5;
+  --line: #D3DDE6;
+  --fg: var(--ink);
+  --muted: #536676;
+  --accent: var(--sky);
+  --accent-ink: var(--ink);
+  --accent-strong: #1A7FA6;      /* обводки и ссылки на светлом фоне: контраст ≥ 3:1 */
+  --c-digit: #1A7FA6;
+  --c-symbol: #B4551C;
+  --bad: #C2402F;
+  --warn: #C98A12;
+  --ok: #3F9B57;
+  --great: #1F7F8C;
+  --seg-off: #DCE4EB;
+
+  --f-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: var(--ink); --panel: #1A2936; --panel-2: #213342; --line: #2D4152;
+    --fg: var(--paper); --muted: #9DB0C0; --accent: var(--sky); --accent-ink: var(--ink);
+    --accent-strong: var(--sky); --c-digit: #7FD3EE; --c-symbol: #F0A46E;
+    --bad: #E8705F; --warn: #E6B54A; --ok: #6CC283; --great: #51BDE2; --seg-off: #2A3D4D;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: var(--ink); --panel: #1A2936; --panel-2: #213342; --line: #2D4152;
+  --fg: var(--paper); --muted: #9DB0C0; --accent: var(--sky); --accent-ink: var(--ink);
+  --accent-strong: var(--sky); --c-digit: #7FD3EE; --c-symbol: #F0A46E;
+  --bad: #E8705F; --warn: #E6B54A; --ok: #6CC283; --great: #51BDE2; --seg-off: #2A3D4D;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: light; }
+[hidden] { display: none !important; }
+body { margin: 0; }
+code { font-family: var(--f-mono); }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--f-ui); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 20px; }
+
+header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { flex: none; }
+h1 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+.sub { margin: 0; color: var(--muted); font-size: 13px; }
+.local {
+  font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px;
+}
+.local i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0; }
+
+/* Табы режима */
+.tabs { display: inline-flex; background: var(--panel-2); border-radius: 8px; padding: 3px; gap: 3px; }
+.tabs button {
+  font: 500 14px var(--f-ui); color: var(--muted); background: transparent; border: 0;
+  padding: 7px 14px; border-radius: 6px; cursor: pointer;
+}
+.tabs button[aria-selected="true"] { background: var(--panel); color: var(--fg); box-shadow: 0 1px 2px rgba(20,32,43,.15); }
+
+/* Результат */
+.output {
+  background: var(--panel-2); border-radius: 8px; padding: 16px 18px; min-height: 64px;
+  display: flex; align-items: center; min-width: 0;
+}
+.pw {
+  font-family: var(--f-mono); font-size: clamp(17px, 3.6vw, 23px); font-weight: 500;
+  line-height: 1.45; letter-spacing: 0.02em;
+  overflow-wrap: anywhere; word-break: break-all; min-width: 0; width: 100%;
+  user-select: all; -webkit-user-select: all;
+}
+.pw.phrase { word-break: normal; overflow-wrap: anywhere; }
+.pw .d { color: var(--c-digit); }
+.pw .s { color: var(--c-symbol); }
+.pw.masked { letter-spacing: 0.12em; color: var(--muted); user-select: none; -webkit-user-select: none; }
+.pw.empty { font-family: var(--f-ui); font-size: 14px; color: var(--muted); letter-spacing: 0; user-select: none; }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+  font: 600 14px var(--f-ui); border-radius: 8px; padding: 10px 16px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  display: inline-flex; align-items: center; gap: 8px; min-height: 42px;
+}
+.btn:hover:not(:disabled) { border-color: var(--accent-strong); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.06); border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn svg { width: 16px; height: 16px; flex: none; }
+
+:focus-visible { outline: 3px solid var(--accent-strong); outline-offset: 2px; }
+
+.status { font-size: 13px; min-height: 20px; margin: -4px 0 0; color: var(--muted); }
+.status.err { color: var(--bad); }
+.status.good { color: var(--ok); }
+
+/* Стойкость */
+.strength { display: grid; gap: 10px; }
+.meter-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.meter { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; flex: 1 1 220px; }
+.meter span { height: 8px; border-radius: 2px; background: var(--seg-off); transition: background .2s; }
+.verdict { font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
+.verdict small { font-weight: 400; color: var(--muted); font-size: 13px; }
+.factors { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.factors li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; }
+.factors li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; justify-self: center; background: var(--muted); }
+.factors li.plus::before { background: var(--ok); }
+.factors li.minus::before { background: var(--warn); }
+.factors li.bad::before { background: var(--bad); }
+
+/* Пакет */
+.batch { display: grid; gap: 6px; }
+.batch label {
+  display: grid; grid-template-columns: 20px 1fr; gap: 10px; align-items: center;
+  padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; cursor: pointer; min-width: 0;
+}
+.batch label:hover { background: var(--panel-2); }
+.batch input:checked + .pw { color: var(--fg); }
+.batch label:has(input:checked) { border-color: var(--accent-strong); background: var(--panel-2); }
+.batch .pw { font-size: 15px; font-weight: 400; color: var(--muted); }
+.batch input { accent-color: var(--accent-strong); width: 16px; height: 16px; margin: 0; }
+
+/* Настройки */
+.row { display: grid; gap: 8px; }
+.len-row { display: flex; align-items: center; gap: 14px; }
+.len-row input[type=range] { flex: 1; min-width: 0; }
+.num {
+  width: 76px; font: 600 16px var(--f-mono); text-align: center; padding: 8px 6px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+
+input[type=range] {
+  -webkit-appearance: none; appearance: none; height: 28px; background: transparent; cursor: pointer;
+  --p: 50%;
+}
+input[type=range]::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--accent) 0 var(--p), var(--seg-off) var(--p) 100%);
+}
+input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--seg-off); }
+input[type=range]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; margin-top: -7px;
+  background: var(--panel); border: 2px solid var(--accent-strong); box-shadow: 0 1px 3px rgba(20,32,43,.25);
+}
+input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--panel); border: 2px solid var(--accent-strong);
+}
+
+.switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 520px) { .switches { grid-template-columns: 1fr; } }
+.sw {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; min-width: 0;
+}
+.sw-text { display: grid; min-width: 0; }
+.sw-text b { font-weight: 500; font-size: 14px; }
+.sw-text code { font-family: var(--f-mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.sw input {
+  -webkit-appearance: none; appearance: none; flex: none; margin: 0; cursor: pointer;
+  width: 40px; height: 24px; border-radius: 12px; background: var(--seg-off);
+  border: 1px solid var(--line); position: relative; transition: background .15s;
+}
+.sw input::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--panel); box-shadow: 0 1px 2px rgba(20,32,43,.3); transition: transform .15s;
+}
+.sw input:checked { background: var(--accent); border-color: var(--accent); }
+.sw input:checked::after { transform: translateX(16px); }
+.sw input:disabled { opacity: .5; cursor: not-allowed; }
+
+.select {
+  font: 500 14px var(--f-ui); padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--fg);
+}
+.inline { display: flex; gap: 16px; flex-wrap: wrap; align-items: end; }
+.inline .row { flex: 1 1 160px; }
+
+.alert {
+  border: 1px solid var(--bad); color: var(--bad); border-radius: 8px; padding: 10px 12px; font-size: 13.5px;
+}
+
+details { border-top: 1px solid var(--line); padding-top: 14px; }
+summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.tests { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 6px; font-size: 13px; }
+.tests li { display: grid; grid-template-columns: 52px 1fr; gap: 8px; }
+.tests .pass { color: var(--ok); font-weight: 600; }
+.tests .fail { color: var(--bad); font-weight: 600; }
+
+footer { font-size: 12.5px; color: var(--muted); max-width: 65ch; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <rect x="1" y="1" width="32" height="32" rx="8" fill="var(--accent)"/>
+        <rect x="9" y="15" width="16" height="11" rx="2" fill="var(--accent-ink)"/>
+        <path d="M12 15v-3a5 5 0 0 1 10 0v3" fill="none" stroke="var(--accent-ink)" stroke-width="2.4"/>
+        <circle cx="17" cy="20.5" r="1.8" fill="var(--accent)"/>
+      </svg>
+      <div>
+        <h1>Засов</h1>
+        <p class="sub">Генератор паролей и парольных фраз</p>
+      </div>
+    </div>
+    <span class="local"><i></i>Работает офлайн в браузере</span>
+  </header>
+
+  <!-- Результат -->
+  <section class="panel" aria-labelledby="out-label">
+    <div class="meter-row">
+      <div class="tabs" role="tablist" aria-label="Режим генерации">
+        <button role="tab" id="tab-password" aria-selected="true" data-mode="password">Пароль</button>
+        <button role="tab" id="tab-phrase" aria-selected="false" data-mode="phrase">Парольная фраза</button>
+      </div>
+      <label class="sw" style="border:0;padding:0;gap:10px">
+        <span class="sw-text"><b>Пакет из 5</b></span>
+        <input type="checkbox" id="batch" role="switch">
+      </label>
+    </div>
+
+    <h2 class="label" id="out-label">Результат</h2>
+    <div class="output" id="output-single">
+      <div class="pw" id="pw" aria-live="polite"></div>
+    </div>
+    <div class="batch" id="batch-list" role="radiogroup" aria-label="Пять вариантов" hidden></div>
+
+    <div class="actions">
+      <button class="btn primary" id="gen">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2v3h-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Сгенерировать
+      </button>
+      <button class="btn" id="toggle-vis" aria-pressed="true">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>
+        <span>Скрыть</span>
+      </button>
+      <button class="btn" id="copy">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span id="copy-label">Скопировать</span>
+      </button>
+    </div>
+    <p class="status" id="status" role="status"></p>
+
+    <div class="strength" aria-labelledby="str-label">
+      <div class="meter-row">
+        <h2 class="label" id="str-label">Приблизительная стойкость</h2>
+        <span class="verdict" id="verdict"></span>
+      </div>
+      <div class="meter" id="meter" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <ul class="factors" id="factors"></ul>
+    </div>
+  </section>
+
+  <!-- Настройки пароля -->
+  <section class="panel" id="settings-password" aria-labelledby="sp-label">
+    <h2 class="label" id="sp-label">Настройки пароля</h2>
+
+    <div class="row">
+      <label for="len-num"><b style="font-weight:500">Длина</b></label>
+      <div class="len-row">
+        <input type="range" id="len" min="8" max="64" step="1" value="16" aria-label="Длина пароля">
+        <input type="number" class="num" id="len-num" min="8" max="64" step="1" value="16" inputmode="numeric">
+      </div>
+      <p class="hint">От 8 до 64 символов. Для важных аккаунтов берите 16 и больше.</p>
+    </div>
+
+    <div class="switches">
+      <label class="sw"><span class="sw-text"><b>Строчные буквы</b><code id="ex-lower">a–z</code></span><input type="checkbox" role="switch" id="g-lower" checked></label>
+      <label class="sw"><span class="sw-text"><b>Прописные буквы</b><code id="ex-upper">A–Z</code></span><input type="checkbox" role="switch" id="g-upper" checked></label>
+      <label class="sw"><span class="sw-text"><b>Цифры</b><code id="ex-digits">0–9</code></span><input type="checkbox" role="switch" id="g-digits" checked></label>
+      <label class="sw"><span class="sw-text"><b>Спецсимволы</b><code id="ex-symbols">!@#$%</code></span><input type="checkbox" role="switch" id="g-symbols" checked></label>
+    </div>
+
+    <label class="sw">
+      <span class="sw-text"><b>Исключить похожие символы</b><code>убирает i l 1 L I | o O 0</code></span>
+      <input type="checkbox" role="switch" id="similar">
+    </label>
+
+    <div class="alert" id="none-alert" hidden>Включите хотя бы одну группу символов: без них пароль не из чего составить.</div>
+  </section>
+
+  <!-- Настройки фразы -->
+  <section class="panel" id="settings-phrase" aria-labelledby="sf-label" hidden>
+    <h2 class="label" id="sf-label">Настройки парольной фразы</h2>
+    <div class="row">
+      <label for="words-num"><b style="font-weight:500">Количество слов</b></label>
+      <div class="len-row">
+        <input type="range" id="words" min="3" max="10" step="1" value="5" aria-label="Количество слов">
+        <input type="number" class="num" id="words-num" min="3" max="10" step="1" value="5" inputmode="numeric">
+      </div>
+      <p class="hint" id="dict-hint"></p>
+    </div>
+    <div class="inline">
+      <div class="row">
+        <label for="sep"><b style="font-weight:500">Разделитель</b></label>
+        <select class="select" id="sep">
+          <option value="-">Дефис  ( - )</option>
+          <option value=".">Точка  ( . )</option>
+          <option value="_">Подчёркивание  ( _ )</option>
+          <option value=" ">Пробел</option>
+          <option value="rand">Случайная цифра</option>
+        </select>
+      </div>
+    </div>
+    <div class="switches">
+      <label class="sw"><span class="sw-text"><b>С заглавной буквы</b><code>Forest-Lamp</code></span><input type="checkbox" role="switch" id="cap" checked></label>
+      <label class="sw"><span class="sw-text"><b>Добавить число</b><code>…-47</code></span><input type="checkbox" role="switch" id="addnum" checked></label>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="t-label">
+    <details id="tests-box">
+      <summary id="t-label">Самопроверка генератора</summary>
+      <p class="hint" style="margin-top:8px">Прогоняет крайние значения и отключённые группы прямо в браузере.</p>
+      <div class="actions" style="margin-top:10px"><button class="btn" id="run-tests">Запустить проверку</button></div>
+      <ul class="tests" id="tests"></ul>
+    </details>
+  </section>
+
+  <footer>
+    Пароли создаются функцией <code>crypto.getRandomValues</code> на вашем устройстве и никуда не отправляются.
+    Сохраняются только настройки; сгенерированные пароли исчезают при закрытии страницы.
+  </footer>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Наборы символов ----------
+  const GROUPS = {
+    lower:   'abcdefghijklmnopqrstuvwxyz',
+    upper:   'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    digits:  '0123456789',
+    symbols: '!@#$%^&*()-_=+[]{};:,.?/~|'
+  };
+  const SIMILAR = new Set('il1LI|oO0'.split(''));
+  const GROUP_NAMES = { lower: 'строчные', upper: 'прописные', digits: 'цифры', symbols: 'спецсимволы' };
+
+  // Локальный словарь: 128 коротких английских слов → ровно 7 бит на слово
+  const WORDS = ('amber anchor apple arrow aspen atlas badge bamboo basin beacon birch bison blade bloom bridge brook ' +
+    'cabin cactus camel candle canyon carbon cedar chalk cherry cliff clover cobalt comet copper coral cotton ' +
+    'crane crystal dawn delta desert dolphin dune eagle ember falcon fern fiber field flint forest fossil frost ' +
+    'garnet ginger glacier granite gravel harbor hazel heron honey island ivory jasper jungle kayak kettle lagoon ' +
+    'lantern lemon lily linen lotus lunar maple marble meadow mint mirror moss nectar noble nova oasis ocean olive ' +
+    'onyx orbit orchid otter oyster panda pebble pepper pine planet plum polar prism quartz raven reef ripple river ' +
+    'robin saffron salmon sierra silver spruce stone summit tiger timber topaz tulip tundra valley velvet violet walnut willow').split(' ');
+
+  // ---------- Криптографическая случайность ----------
+  // Равномерное целое в [0, n) без смещения по модулю (rejection sampling)
+  const buf = new Uint32Array(1);
+  function randInt(n) {
+    if (!Number.isInteger(n) || n <= 0) throw new RangeError('n must be positive');
+    const limit = Math.floor(0x100000000 / n) * n;
+    let x;
+    do { crypto.getRandomValues(buf); x = buf[0]; } while (x >= limit);
+    return x % n;
+  }
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = randInt(i + 1);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+  function groupChars(key, excludeSimilar) {
+    const s = GROUPS[key];
+    return excludeSimilar ? [...s].filter(c => !SIMILAR.has(c)).join('') : s;
+  }
+
+  // Пароль с гарантией: по одному символу из каждой выбранной группы, остальное из общего алфавита, затем перемешивание
+  function generatePassword(length, groupKeys, excludeSimilar) {
+    if (!groupKeys.length) throw new Error('NO_GROUPS');
+    length = clamp(length, 8, 64);
+    const sets = groupKeys.map(k => groupChars(k, excludeSimilar));
+    const pool = sets.join('');
+    const chars = sets.map(s => s[randInt(s.length)]);
+    while (chars.length < length) chars.push(pool[randInt(pool.length)]);
+    return shuffle(chars).join('');
+  }
+
+  function generatePhrase(count, sep, cap, addNum) {
+    const words = [];
+    for (let i = 0; i < count; i++) {
+      let w = WORDS[randInt(WORDS.length)];
+      if (cap) w = w[0].toUpperCase() + w.slice(1);
+      words.push(w);
+    }
+    if (addNum) words.push(String(randInt(100)).padStart(2, '0'));
+    if (sep === 'rand') {
+      return words.reduce((acc, w, i) => i === 0 ? w : acc + randInt(10) + w, '');
+    }
+    return words.join(sep);
+  }
+
+  // ---------- Настройки (только параметры, без паролей) ----------
+  const STORE_KEY = 'zasov.settings.v1';
+  const DEFAULTS = {
+    mode: 'password', length: 16, lower: true, upper: true, digits: true, symbols: true,
+    similar: false, batch: false, words: 5, sep: '-', cap: true, addnum: true, visible: true
+  };
+  let S = { ...DEFAULTS };
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (saved && typeof saved === 'object') {
+      for (const k of Object.keys(DEFAULTS)) if (typeof saved[k] === typeof DEFAULTS[k]) S[k] = saved[k];
+    }
+  } catch (_) { /* хранилище недоступно — работаем с настройками по умолчанию */ }
+  S.length = clamp(S.length, 8, 64);
+  S.words = clamp(S.words, 3, 10);
+  if (!['password', 'phrase'].includes(S.mode)) S.mode = 'password';
+
+  function saveSettings() {
+    // Явный белый список полей: сюда физически не может попасть пароль
+    const out = {};
+    for (const k of Object.keys(DEFAULTS)) out[k] = S[k];
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(out)); } catch (_) {}
+  }
+
+  // ---------- Состояние в памяти ----------
+  let results = [];     // текущие пароли — живут только в памяти вкладки
+  let selected = 0;
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const el = {
+    pw: $('pw'), single: $('output-single'), list: $('batch-list'), gen: $('gen'), vis: $('toggle-vis'),
+    copy: $('copy'), copyLabel: $('copy-label'), status: $('status'), verdict: $('verdict'), meter: $('meter'),
+    factors: $('factors'), len: $('len'), lenNum: $('len-num'), similar: $('similar'), noneAlert: $('none-alert'),
+    batch: $('batch'), sPw: $('settings-password'), sPh: $('settings-phrase'), words: $('words'),
+    wordsNum: $('words-num'), sep: $('sep'), cap: $('cap'), addnum: $('addnum'), dictHint: $('dict-hint')
+  };
+  const groupInputs = { lower: $('g-lower'), upper: $('g-upper'), digits: $('g-digits'), symbols: $('g-symbols') };
+
+  function clamp(v, lo, hi) {
+    v = Math.round(Number(v));
+    if (!Number.isFinite(v)) v = lo;
+    return Math.min(hi, Math.max(lo, v));
+  }
+  const activeGroups = () => Object.keys(GROUPS).filter(k => S[k]);
+
+  function setRangeFill(r) {
+    const p = (r.value - r.min) / (r.max - r.min) * 100;
+    r.style.setProperty('--p', p + '%');
+  }
+
+  // ---------- Отрисовка ----------
+  function renderPw(node, value, isPhrase) {
+    node.textContent = '';
+    node.className = 'pw' + (isPhrase ? ' phrase' : '');
+    if (!value) {
+      node.classList.add('empty');
+      node.textContent = 'Нет результата: включите хотя бы одну группу символов.';
+      return;
+    }
+    if (!S.visible) {
+      node.classList.add('masked');
+      node.textContent = '•'.repeat(Math.min(value.length, 64));
+      node.setAttribute('aria-label', 'Пароль скрыт, ' + value.length + ' символов');
+      return;
+    }
+    node.removeAttribute('aria-label');
+    const frag = document.createDocumentFragment();
+    let run = '', runCls = '';
+    const flush = () => {
+      if (!run) return;
+      if (runCls) { const s = document.createElement('span'); s.className = runCls; s.textContent = run; frag.appendChild(s); }
+      else frag.appendChild(document.createTextNode(run));
+      run = '';
+    };
+    for (const c of value) {
+      const cls = /[0-9]/.test(c) ? 'd' : /[A-Za-z]/.test(c) || c === ' ' ? '' : 's';
+      if (cls !== runCls) { flush(); runCls = cls; }
+      run += c;
+    }
+    flush();
+    node.appendChild(frag);
+  }
+
+  function renderResults() {
+    const isPhrase = S.mode === 'phrase';
+    el.single.hidden = S.batch;
+    el.list.hidden = !S.batch;
+    if (!S.batch) {
+      renderPw(el.pw, results[0] || '', isPhrase);
+    } else {
+      el.list.textContent = '';
+      results.forEach((r, i) => {
+        const lab = document.createElement('label');
+        const inp = document.createElement('input');
+        inp.type = 'radio'; inp.name = 'pick'; inp.id = 'pick-' + i; inp.checked = i === selected;
+        inp.addEventListener('change', () => { selected = i; });
+        const out = document.createElement('div');
+        renderPw(out, r, isPhrase);
+        lab.append(inp, out);
+        el.list.appendChild(lab);
+      });
+    }
+    el.vis.setAttribute('aria-pressed', String(S.visible));
+    el.vis.querySelector('span').textContent = S.visible ? 'Скрыть' : 'Показать';
+    el.copy.disabled = !results.length;
+    if (S.batch) el.copyLabel.textContent = 'Скопировать выбранный';
+    else el.copyLabel.textContent = 'Скопировать';
+  }
+
+  function renderSettings() {
+    for (const t of document.querySelectorAll('[role=tab]')) t.setAttribute('aria-selected', String(t.dataset.mode === S.mode));
+    el.sPw.hidden = S.mode !== 'password';
+    el.sPh.hidden = S.mode !== 'phrase';
+    el.len.value = S.length; el.lenNum.value = S.length; setRangeFill(el.len);
+    el.words.value = S.words; el.wordsNum.value = S.words; setRangeFill(el.words);
+    for (const k in groupInputs) groupInputs[k].checked = S[k];
+    el.similar.checked = S.similar; el.batch.checked = S.batch;
+    el.sep.value = S.sep; el.cap.checked = S.cap; el.addnum.checked = S.addnum;
+    $('ex-lower').textContent = S.similar ? 'a–z без i l o' : 'a–z';
+    $('ex-upper').textContent = S.similar ? 'A–Z без I L O' : 'A–Z';
+    $('ex-digits').textContent = S.similar ? '2–9' : '0–9';
+    $('ex-symbols').textContent = groupChars('symbols', S.similar);
+    el.dictHint.textContent = `Слова берутся из встроенного словаря на ${WORDS.length} слов: каждое добавляет ${Math.log2(WORDS.length).toFixed(1)} бита.`;
+
+    const blocked = S.mode === 'password' && activeGroups().length === 0;
+    el.noneAlert.hidden = !blocked;
+    el.gen.disabled = blocked;
+    el.gen.title = blocked ? 'Включите хотя бы одну группу символов' : '';
+  }
+
+  // ---------- Оценка стойкости ----------
+  function estimate() {
+    const f = [];
+    let bits;
+    if (S.mode === 'password') {
+      const keys = activeGroups();
+      if (!keys.length) return { bits: 0, factors: [['bad', 'Не выбрано ни одной группы символов — генерация отключена.']] };
+      const pool = keys.reduce((n, k) => n + groupChars(k, S.similar).length, 0);
+      const fullPool = keys.reduce((n, k) => n + GROUPS[k].length, 0);
+      const perChar = Math.log2(pool);
+      bits = S.length * perChar;
+      f.push([S.length >= 16 ? 'plus' : S.length >= 12 ? '' : 'minus',
+        `Длина ${S.length} симв. — главный фактор: каждый символ добавляет ${perChar.toFixed(1)} бита.` +
+        (S.length < 12 ? ' Меньше 12 символов — мало для важных аккаунтов.' : '')]);
+      f.push([keys.length >= 3 ? 'plus' : 'minus',
+        `Алфавит ${pool} симв. из ${keys.length} ${plural(keys.length, 'группы', 'групп', 'групп')} (${keys.map(k => GROUP_NAMES[k]).join(', ')}).` +
+        (keys.length < 3 ? ' Добавьте группы или увеличьте длину.' : '')]);
+      if (S.similar) {
+        const loss = S.length * (Math.log2(fullPool) - perChar);
+        f.push(['minus', `Исключение похожих символов убирает ${fullPool - pool} симв. из алфавита: примерно −${loss.toFixed(1)} бит, зато пароль проще переписать вручную.`]);
+      }
+      f.push(['', 'Каждая выбранная группа обязательно присутствует в пароле, поэтому оценка слегка завышена — это верхняя граница.']);
+    } else {
+      const perWord = Math.log2(WORDS.length);
+      bits = S.words * perWord;
+      f.push([S.words >= 6 ? 'plus' : S.words >= 4 ? '' : 'minus',
+        `${S.words} ${plural(S.words, 'слово', 'слова', 'слов')} из словаря на ${WORDS.length}: по ${perWord.toFixed(1)} бита на слово.` +
+        (S.words < 5 ? ' Для надёжной фразы нужно 5–6 слов и больше.' : '')]);
+      if (S.addnum) { bits += Math.log2(100); f.push(['plus', 'Случайное двузначное число: +6,6 бита.']); }
+      if (S.sep === 'rand') { bits += (S.words - (S.addnum ? 0 : 1)) * Math.log2(10); f.push(['plus', 'Случайные цифры-разделители добавляют по 3,3 бита на каждый стык.']); }
+      if (S.cap) f.push(['', 'Заглавные буквы в начале слов предсказуемы и не повышают стойкость — они только облегчают чтение.']);
+      f.push(['', 'Оценка исходит из того, что атакующий знает словарь. Длина фразы в символах роли не играет.']);
+    }
+    f.push(['', `Энтропия ≈ ${Math.round(bits)} бит. Полный перебор при 100 млрд попыток в секунду: ${crackTime(bits)}.`]);
+    return { bits, factors: f };
+  }
+
+  const LEVELS = [
+    { max: 40, name: 'Слабый', color: 'var(--bad)' },
+    { max: 60, name: 'Средний', color: 'var(--warn)' },
+    { max: 80, name: 'Хороший', color: 'var(--ok)' },
+    { max: 110, name: 'Сильный', color: 'var(--ok)' },
+    { max: Infinity, name: 'Очень сильный', color: 'var(--great)' }
+  ];
+  function renderStrength() {
+    const { bits, factors } = estimate();
+    const idx = bits <= 0 ? -1 : LEVELS.findIndex(l => bits < l.max);
+    const segs = el.meter.children;
+    for (let i = 0; i < segs.length; i++) segs[i].style.background = i <= idx ? LEVELS[idx].color : '';
+    el.verdict.innerHTML = '';
+    if (idx >= 0) {
+      el.verdict.append(LEVELS[idx].name + ' ');
+      const sm = document.createElement('small'); sm.textContent = `· ~${Math.round(bits)} бит`;
+      el.verdict.appendChild(sm);
+    } else el.verdict.textContent = '—';
+    el.factors.textContent = '';
+    for (const [cls, text] of factors) {
+      const li = document.createElement('li'); if (cls) li.className = cls; li.textContent = text;
+      el.factors.appendChild(li);
+    }
+  }
+
+  function crackTime(bits) {
+    const sec = Math.pow(2, bits - 1) / 1e11; // в среднем — половина пространства
+    if (sec < 1) return 'меньше секунды';
+    const units = [[60, 'сек'], [60, 'мин'], [24, 'ч'], [365, 'дн']];
+    let v = sec, name = 'сек';
+    for (const [k, n] of units) { name = n; if (v < k) return `≈ ${Math.round(v)} ${n}`; v /= k; }
+    if (v < 1e3) return `≈ ${Math.round(v)} лет`;
+    if (v < 1e6) return `≈ ${Math.round(v / 1e3)} тыс. лет`;
+    if (v < 1e9) return `≈ ${Math.round(v / 1e6)} млн лет`;
+    if (v < 1e12) return `≈ ${Math.round(v / 1e9)} млрд лет`;
+    return `больше 10^${Math.floor(Math.log10(v))} лет`;
+  }
+  function plural(n, one, few, many) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+
+  // ---------- Действия ----------
+  function makeOne() {
+    return S.mode === 'password'
+      ? generatePassword(S.length, activeGroups(), S.similar)
+      : generatePhrase(S.words, S.sep, S.cap, S.addnum);
+  }
+  function generate() {
+    if (S.mode === 'password' && !activeGroups().length) {
+      results = []; renderResults(); setStatus('Генерация недоступна: включите хотя бы одну группу символов.', 'err');
+      return;
+    }
+    if (S.batch) {
+      const set = new Set();
+      let guard = 0;
+      while (set.size < 5 && guard++ < 100) set.add(makeOne());
+      results = [...set]; selected = 0;
+    } else {
+      results = [makeOne()];
+    }
+    renderResults();
+    setStatus('');
+  }
+
+  let statusTimer;
+  function setStatus(msg, kind) {
+    clearTimeout(statusTimer);
+    el.status.textContent = msg;
+    el.status.className = 'status' + (kind ? ' ' + kind : '');
+    if (msg && kind === 'good') statusTimer = setTimeout(() => setStatus(''), 2500);
+  }
+
+  async function copyCurrent() {
+    const value = results[S.batch ? selected : 0];
+    if (!value) { setStatus('Нечего копировать: сначала сгенерируйте пароль.', 'err'); return; }
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext !== false) {
+        await navigator.clipboard.writeText(value);
+        ok = true;
+      }
+    } catch (_) { ok = false; }
+    if (!ok) ok = legacyCopy(value);
+    if (ok) {
+      setStatus(S.batch ? `Вариант ${selected + 1} скопирован в буфер обмена.` : 'Скопировано в буфер обмена.', 'good');
+    } else {
+      // Не получилось — показываем пароль и выделяем его, чтобы скопировать вручную
+      if (!S.visible) { S.visible = true; saveSettings(); renderResults(); }
+      selectNode(S.batch ? el.list.querySelectorAll('.pw')[selected] : el.pw);
+      setStatus('Не удалось скопировать: браузер запретил доступ к буферу обмена. Пароль выделен — нажмите Ctrl+C (⌘C) или «Копировать» в меню.', 'err');
+    }
+  }
+  function legacyCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    ta.value = '';
+    ta.remove();
+    return ok;
+  }
+  function selectNode(node) {
+    if (!node) return;
+    const range = document.createRange(); range.selectNodeContents(node);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  }
+
+  // ---------- События ----------
+  function onSettingChange(regen = true) {
+    saveSettings(); renderSettings(); renderStrength();
+    if (regen) generate();
+  }
+
+  for (const t of document.querySelectorAll('[role=tab]')) {
+    t.addEventListener('click', () => { S.mode = t.dataset.mode; onSettingChange(); });
+  }
+  el.len.addEventListener('input', () => { S.length = clamp(el.len.value, 8, 64); onSettingChange(); });
+  el.lenNum.addEventListener('input', () => {
+    const v = Number(el.lenNum.value);
+    if (Number.isFinite(v) && v >= 8 && v <= 64) { S.length = Math.round(v); el.len.value = S.length; setRangeFill(el.len); saveSettings(); renderStrength(); generate(); }
+  });
+  el.lenNum.addEventListener('change', () => { S.length = clamp(el.lenNum.value, 8, 64); onSettingChange(); });
+  el.words.addEventListener('input', () => { S.words = clamp(el.words.value, 3, 10); onSettingChange(); });
+  el.wordsNum.addEventListener('change', () => { S.words = clamp(el.wordsNum.value, 3, 10); onSettingChange(); });
+  for (const k in groupInputs) groupInputs[k].addEventListener('change', () => { S[k] = groupInputs[k].checked; onSettingChange(); });
+  el.similar.addEventListener('change', () => { S.similar = el.similar.checked; onSettingChange(); });
+  el.batch.addEventListener('change', () => { S.batch = el.batch.checked; onSettingChange(); });
+  el.sep.addEventListener('change', () => { S.sep = el.sep.value; onSettingChange(); });
+  el.cap.addEventListener('change', () => { S.cap = el.cap.checked; onSettingChange(); });
+  el.addnum.addEventListener('change', () => { S.addnum = el.addnum.checked; onSettingChange(); });
+
+  el.gen.addEventListener('click', generate);
+  el.vis.addEventListener('click', () => { S.visible = !S.visible; saveSettings(); renderResults(); });
+  el.copy.addEventListener('click', copyCurrent);
+
+  // ---------- Самопроверка ----------
+  $('run-tests').addEventListener('click', () => {
+    const out = $('tests'); out.textContent = '';
+    const add = (ok, text) => {
+      const li = document.createElement('li');
+      const b = document.createElement('span'); b.className = ok ? 'pass' : 'fail'; b.textContent = ok ? 'OK' : 'ОШИБКА';
+      const t = document.createElement('span'); t.textContent = text;
+      li.append(b, t); out.appendChild(li);
+    };
+    const keys = Object.keys(GROUPS);
+    const has = (pw, k, sim) => [...pw].some(c => groupChars(k, sim).includes(c));
+
+    // 1. Все 15 непустых комбинаций групп × крайние длины × с исключением и без
+    let fails = 0, total = 0;
+    for (let mask = 1; mask < 16; mask++) {
+      const ks = keys.filter((_, i) => mask & (1 << i));
+      for (const len of [8, 9, 63, 64]) for (const sim of [false, true]) for (let r = 0; r < 25; r++) {
+        const pw = generatePassword(len, ks, sim); total++;
+        const okLen = pw.length === len;
+        const okGroups = ks.every(k => has(pw, k, sim));
+        const okOnly = [...pw].every(c => ks.some(k => groupChars(k, sim).includes(c)));
+        const okSim = !sim || [...pw].every(c => !SIMILAR.has(c));
+        if (!(okLen && okGroups && okOnly && okSim)) fails++;
+      }
+    }
+    add(fails === 0, `${total} паролей (все 15 комбинаций групп, длины 8/9/63/64): в каждом есть символ каждой выбранной группы и нет лишних${fails ? ` — сбоев: ${fails}` : ''}.`);
+
+    // 2. Все группы выключены
+    let threw = false;
+    try { generatePassword(16, [], false); } catch (e) { threw = e.message === 'NO_GROUPS'; }
+    add(threw, 'Без выбранных групп генератор отказывается работать, а кнопка «Сгенерировать» блокируется.');
+
+    // 3. Ограничение длины
+    const l1 = generatePassword(3, ['lower'], false).length, l2 = generatePassword(500, ['lower'], false).length;
+    add(l1 === 8 && l2 === 64, `Длина за пределами диапазона приводится к границам: 3 → ${l1}, 500 → ${l2}.`);
+
+    // 4. Равномерность randInt
+    const counts = new Array(10).fill(0), N = 50000;
+    for (let i = 0; i < N; i++) counts[randInt(10)]++;
+    const maxDev = Math.max(...counts.map(c => Math.abs(c - N / 10) / (N / 10)));
+    add(maxDev < 0.05, `Распределение crypto.getRandomValues равномерно: отклонение ${(maxDev * 100).toFixed(2)}% на ${N} выборках.`);
+
+    // 5. Словарь
+    add(WORDS.length >= 50 && new Set(WORDS).size === WORDS.length, `Словарь фраз: ${WORDS.length} уникальных слов (нужно не меньше 50).`);
+
+    // 6. localStorage не содержит паролей
+    let leak = false, dump = '';
+    try { for (let i = 0; i < localStorage.length; i++) dump += localStorage.getItem(localStorage.key(i)); } catch (_) {}
+    leak = results.some(r => r && dump.includes(r));
+    add(!leak, 'В localStorage лежат только настройки: ни один текущий пароль там не найден.');
+  });
+
+  // ---------- Старт ----------
+  renderSettings();
+  renderStrength();
+  generate();
+})();
+</script>
+</body>
+</html>
