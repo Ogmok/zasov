@@ -375,7 +375,8 @@ footer { font-size: 12.5px; color: var(--muted); max-width: 65ch; }
     'garnet ginger glacier granite gravel harbor hazel heron honey island ivory jasper jungle kayak kettle lagoon ' +
     'lantern lemon lily linen lotus lunar maple marble meadow mint mirror moss nectar noble nova oasis ocean olive ' +
     'onyx orbit orchid otter oyster panda pebble pepper pine planet plum polar prism quartz raven reef ripple river ' +
-    'robin saffron salmon sierra silver spruce stone summit tiger timber topaz tulip tundra valley velvet violet walnut willow').split(' ');
+    'robin saffron salmon sierra silver spruce stone summit tiger timber topaz tulip tundra valley velvet violet walnut willow ' +
+    'acorn breeze canoe dahlia fjord grove harp igloo juniper').split(' ');
 
   // ---------- Криптографическая случайность ----------
   // Равномерное целое в [0, n) без смещения по модулю (rejection sampling)
@@ -547,7 +548,7 @@ footer { font-size: 12.5px; color: var(--muted); max-width: 65ch; }
     $('ex-upper').textContent = S.similar ? 'A–Z без I L O' : 'A–Z';
     $('ex-digits').textContent = S.similar ? '2–9' : '0–9';
     $('ex-symbols').textContent = groupChars('symbols', S.similar);
-    el.dictHint.textContent = `Слова берутся из встроенного словаря на ${WORDS.length} слов: каждое добавляет ${Math.log2(WORDS.length).toFixed(1)} бита.`;
+    el.dictHint.textContent = `Слова берутся из встроенного словаря на ${WORDS.length} слов: каждое добавляет ${Math.log2(WORDS.length).toFixed(1).replace('.', ',')} бита.`;
 
     const blocked = S.mode === 'password' && activeGroups().length === 0;
     el.noneAlert.hidden = !blocked;
@@ -567,21 +568,21 @@ footer { font-size: 12.5px; color: var(--muted); max-width: 65ch; }
       const perChar = Math.log2(pool);
       bits = S.length * perChar;
       f.push([S.length >= 16 ? 'plus' : S.length >= 12 ? '' : 'minus',
-        `Длина ${S.length} симв. — главный фактор: каждый символ добавляет ${perChar.toFixed(1)} бита.` +
+        `Длина ${S.length} симв. — главный фактор: каждый символ добавляет ${perChar.toFixed(1).replace('.', ',')} бита.` +
         (S.length < 12 ? ' Меньше 12 символов — мало для важных аккаунтов.' : '')]);
       f.push([keys.length >= 3 ? 'plus' : 'minus',
         `Алфавит ${pool} симв. из ${keys.length} ${plural(keys.length, 'группы', 'групп', 'групп')} (${keys.map(k => GROUP_NAMES[k]).join(', ')}).` +
         (keys.length < 3 ? ' Добавьте группы или увеличьте длину.' : '')]);
       if (S.similar) {
         const loss = S.length * (Math.log2(fullPool) - perChar);
-        f.push(['minus', `Исключение похожих символов убирает ${fullPool - pool} симв. из алфавита: примерно −${loss.toFixed(1)} бит, зато пароль проще переписать вручную.`]);
+        f.push(['minus', `Исключение похожих символов убирает ${fullPool - pool} симв. из алфавита: примерно −${loss.toFixed(1).replace('.', ',')} бит, зато пароль проще переписать вручную.`]);
       }
       f.push(['', 'Каждая выбранная группа обязательно присутствует в пароле, поэтому оценка слегка завышена — это верхняя граница.']);
     } else {
       const perWord = Math.log2(WORDS.length);
       bits = S.words * perWord;
       f.push([S.words >= 6 ? 'plus' : S.words >= 4 ? '' : 'minus',
-        `${S.words} ${plural(S.words, 'слово', 'слова', 'слов')} из словаря на ${WORDS.length}: по ${perWord.toFixed(1)} бита на слово.` +
+        `${S.words} ${plural(S.words, 'слово', 'слова', 'слов')} из словаря на ${WORDS.length}: по ${perWord.toFixed(1).replace('.', ',')} бита на слово.` +
         (S.words < 5 ? ' Для надёжной фразы нужно 5–6 слов и больше.' : '')]);
       if (S.addnum) { bits += Math.log2(100); f.push(['plus', 'Случайное двузначное число: +6,6 бита.']); }
       if (S.sep === 'rand') { bits += (S.words - (S.addnum ? 0 : 1)) * Math.log2(10); f.push(['plus', 'Случайные цифры-разделители добавляют по 3,3 бита на каждый стык.']); }
@@ -773,7 +774,7 @@ footer { font-size: 12.5px; color: var(--muted); max-width: 65ch; }
     const counts = new Array(10).fill(0), N = 50000;
     for (let i = 0; i < N; i++) counts[randInt(10)]++;
     const maxDev = Math.max(...counts.map(c => Math.abs(c - N / 10) / (N / 10)));
-    add(maxDev < 0.05, `Распределение crypto.getRandomValues равномерно: отклонение ${(maxDev * 100).toFixed(2)}% на ${N} выборках.`);
+    add(maxDev < 0.05, `Распределение crypto.getRandomValues равномерно: отклонение ${(maxDev * 100).toFixed(2).replace('.', ',')}% на ${N} выборках.`);
 
     // 5. Словарь
     add(WORDS.length >= 50 && new Set(WORDS).size === WORDS.length, `Словарь фраз: ${WORDS.length} уникальных слов (нужно не меньше 50).`);
